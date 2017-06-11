@@ -1,11 +1,12 @@
 package net.engio.mbassy.listener;
 
-import net.engio.mbassy.bus.error.MessageBusException;
 import net.engio.mbassy.common.ReflectionUtils;
 import net.engio.mbassy.dispatch.HandlerInvocation;
 import net.engio.mbassy.dispatch.groovy.GroovyFilter;
 
 import java.lang.annotation.Annotation;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
@@ -22,6 +23,7 @@ public class MessageHandler {
 
     public static final class Properties{
 
+        public static final String MethodHandle = "handle";
         public static final String HandlerMethod = "handler";
         public static final String InvocationMode = "invocationMode";
         public static final String Filter = "filter";
@@ -53,9 +55,15 @@ public class MessageHandler {
             if(filter == null){
                 filter = new IMessageFilter[]{};
             }
+            Map<String, Object> properties = new HashMap<String, Object>();
             Class[] handledMessages = handler.getParameterTypes();
             handler.setAccessible(true);
-            Map<String, Object> properties = new HashMap<String, Object>();
+            try {
+                MethodHandle methodHandle = MethodHandles.lookup().unreflect(handler);
+                properties.put(MethodHandle, methodHandle);
+            } catch (IllegalAccessException e) {
+                throw new IllegalStateException(e);
+            }
             properties.put(HandlerMethod, handler);
             // add Groovy filter if a condition is present
             if(! handlerConfig.condition().isEmpty()){
@@ -81,6 +89,7 @@ public class MessageHandler {
         }
     }
 
+    private final MethodHandle methodHandle;
 
     private final Method handler;
 
@@ -106,6 +115,7 @@ public class MessageHandler {
     public MessageHandler(Map<String, Object> properties){
         super();
         validate(properties);
+        this.methodHandle = (MethodHandle) properties.get(Properties.MethodHandle);
         this.handler = (Method)properties.get(Properties.HandlerMethod);
         this.filter = (IMessageFilter[])properties.get(Properties.Filter);
         this.condition = (String)properties.get(Properties.Condition);
@@ -165,6 +175,10 @@ public class MessageHandler {
 
     public int getPriority() {
         return priority;
+    }
+
+    public MethodHandle getMethodHandle() {
+        return methodHandle;
     }
 
     public Method getMethod() {
