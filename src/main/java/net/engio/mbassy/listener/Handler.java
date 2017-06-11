@@ -25,11 +25,11 @@ public @interface Handler {
     
     
     /**
-     * Defines a filter condition as Expression Language. This can be used to filter the events based on 
+     * Defines a filter condition as Groovy. This can be used to filter the events based on
      * attributes of the event object. Note that the expression must resolve to either
      * <code>true</code> to allow the event or <code>false</code> to block it from delivery to the handler. 
      * The message itself is available as "msg" variable. 
-     * @return the condition in EL syntax.
+     * @return the condition in Groovy syntax.
      */
     String condition() default "";
 

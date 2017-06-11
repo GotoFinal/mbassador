@@ -3,11 +3,9 @@ package net.engio.mbassy;
 import net.engio.mbassy.bus.MBassador;
 import net.engio.mbassy.bus.config.IBusConfiguration;
 import net.engio.mbassy.common.MessageBusTest;
-import net.engio.mbassy.listener.Enveloped;
 import net.engio.mbassy.listener.Handler;
 import net.engio.mbassy.listener.Listener;
 import net.engio.mbassy.listener.References;
-import net.engio.mbassy.subscription.MessageEnvelope;
 import org.junit.Test;
 
 import java.util.HashSet;
@@ -27,9 +25,6 @@ public class ConditionalHandlerTest extends MessageBusTest {
 
 		TestEvent message = new TestEvent("TEST", 0);
 		bus.publish(message);
-
-		assertTrue(message.wasHandledBy("handleTypeMessage", "handleEnvelopedMessage"));
-        assertFalse(message.wasHandledBy("handleInvalidEL"));
 	}
 
 	@Test
@@ -41,19 +36,17 @@ public class ConditionalHandlerTest extends MessageBusTest {
 		bus.publish(message);
 
 		assertTrue(message.wasHandledBy("handleSizeMessage"));
-        assertFalse(message.wasHandledBy("handleInvalidEL"));
 	}
 
 	@Test
-	public void testHandleCombinedEL(){
+	public void testHandleCombinedGroovy(){
 		MBassador bus = createBus(SyncAsync());
 		bus.subscribe(new ConditionalMessageListener());
 
 		TestEvent message = new TestEvent("", 3);
 		bus.publish(message);
 
-        assertTrue(message.wasHandledBy("handleCombinedEL"));
-        assertFalse(message.wasHandledBy("handleInvalidEL"));
+        assertTrue(message.wasHandledBy("handleCombinedGroovy"));
 	}
 
 	@Test
@@ -68,15 +61,14 @@ public class ConditionalHandlerTest extends MessageBusTest {
 	}
 
 	@Test
-	public void testHandleMethodAccessEL(){
+	public void testHandleMethodAccessGroovy(){
 		MBassador bus = createBus(SyncAsync());
 		bus.subscribe(new ConditionalMessageListener());
 
 		TestEvent message = new TestEvent("XYZ", 1);
 		bus.publish(message);
 
-        assertTrue(message.wasHandledBy("handleMethodAccessEL"));
-        assertFalse(message.wasHandledBy("handleInvalidEL"));
+        assertTrue(message.wasHandledBy("handleMethodAccessGroovy"));
 
     }
 
@@ -126,25 +118,14 @@ public class ConditionalHandlerTest extends MessageBusTest {
             message.handledBy("handleSizeMessage");
         }
 
-        @Handler(condition = "msg.foo > 4")
-        public void handleInvalidEL(TestEvent message) {
-            message.handledBy("handleInvalidEL");
-        }
-
         @Handler(condition = "msg.size > 2 && msg.size < 4")
-        public void handleCombinedEL(TestEvent message) {
-            message.handledBy( "handleCombinedEL");
+        public void handleCombinedGroovy(TestEvent message) {
+            message.handledBy( "handleCombinedGroovy");
         }
 
         @Handler(condition = "msg.getType().equals('XYZ') && msg.getSize() == 1")
-        public void handleMethodAccessEL(TestEvent message) {
-            message.handledBy("handleMethodAccessEL");
-        }
-
-        @Handler(condition = "msg.type == 'TEST'")
-        @Enveloped(messages = {TestEvent.class, Object.class})
-        public void handleEnvelopedMessage(MessageEnvelope envelope) {
-            envelope.<TestEvent>getMessage().handledBy("handleEnvelopedMessage");
+        public void handleMethodAccessGroovy(TestEvent message) {
+            message.handledBy("handleMethodAccessGroovy");
         }
 
     }

@@ -1,6 +1,5 @@
 import net.engio.mbassy.dispatch.HandlerInvocation;
 import net.engio.mbassy.listener.*;
-import net.engio.mbassy.subscription.MessageEnvelope;
 import net.engio.mbassy.subscription.SubscriptionContext;
 
 import java.io.File;
@@ -89,22 +88,12 @@ public class ListenerDefinition {
         }
 
         /**
-         * Another way of controlling which messages are delivered to handlers is by using JUEL expressions.
+         * Another way of controlling which messages are delivered to handlers is by using Groovy expressions.
          * These can be specified as conditions (no type checking etc.) and will be evaluated on the msg.
          * This particular condition will filter out all empty strings
          */
         @Handler(condition = "!msg.isEmpty()")
         public void handleNonEmptyStrings(String msg) {
-        }
-
-        /**
-         *
-         */
-        @Handler(delivery = Invoke.Synchronously, rejectSubtypes = true)
-        @Enveloped(messages = {Object.class, String.class})
-        public void handleUnrelatedMessageTypes(MessageEnvelope envelope) {
-            // the envelope will contain either an instance of Object.class or String.class
-            // if rejectSubtypes were set to 'false' (default) also subtypes of TestMessage or TestMessage2 would be allowed
         }
 
         static class Urlfilter implements IMessageFilter<String>{

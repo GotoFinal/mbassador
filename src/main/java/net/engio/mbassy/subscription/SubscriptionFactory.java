@@ -48,9 +48,6 @@ public class SubscriptionFactory {
 
     protected IMessageDispatcher buildDispatcher(SubscriptionContext context, IHandlerInvocation invocation) throws MessageBusException {
         IMessageDispatcher dispatcher = new MessageDispatcher(context, invocation);
-        if (context.getHandler().isEnveloped()) {
-            dispatcher = new EnvelopedMessageDispatcher(dispatcher);
-        }
         if (context.getHandler().isFiltered()) {
             dispatcher = new FilteredMessageDispatcher(dispatcher);
         }

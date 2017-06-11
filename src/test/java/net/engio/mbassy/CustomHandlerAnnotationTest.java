@@ -1,16 +1,24 @@
 package net.engio.mbassy;
 
-import net.engio.mbassy.bus.MBassador;
-import net.engio.mbassy.common.MessageBusTest;
-import net.engio.mbassy.listener.*;
-import net.engio.mbassy.subscription.MessageEnvelope;
-import net.engio.mbassy.subscription.SubscriptionContext;
-import org.junit.Test;
-
-import java.lang.annotation.*;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Inherited;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+
+import org.junit.Test;
+
+import net.engio.mbassy.bus.MBassador;
+import net.engio.mbassy.common.MessageBusTest;
+import net.engio.mbassy.listener.Filter;
+import net.engio.mbassy.listener.Handler;
+import net.engio.mbassy.listener.IMessageFilter;
+import net.engio.mbassy.listener.MessageHandler;
+import net.engio.mbassy.listener.Synchronized;
+import net.engio.mbassy.subscription.SubscriptionContext;
 
 /**
  * Tests a custom handler annotation with a @Handler meta annotation and a default filter.
@@ -19,7 +27,6 @@ public class CustomHandlerAnnotationTest extends MessageBusTest
 {
 	/**
 	 * Handler annotation that adds a default filter on the NamedMessage.
-	 * Enveloped is in no way required, but simply added to test a meta enveloped annotation.
 	 */
 	@Retention(value = RetentionPolicy.RUNTIME)
 	@Inherited
@@ -36,7 +43,6 @@ public class CustomHandlerAnnotationTest extends MessageBusTest
 
     /**
      * Handler annotation that adds a default filter on the NamedMessage.
-     * Enveloped is in no way required, but simply added to test a meta enveloped annotation.
      */
     @Retention(value = RetentionPolicy.RUNTIME)
     @Inherited
@@ -52,8 +58,7 @@ public class CustomHandlerAnnotationTest extends MessageBusTest
 	@Target(value = { ElementType.METHOD, ElementType.ANNOTATION_TYPE })
 	@Inherited
 	@Handler(filters = { @Filter(NamedMessageFilter.class) })
-	@Enveloped(messages = NamedMessage.class)
-	@interface EnvelopedNamedMessageHandler
+	@interface SomeNamedMessageHandler
 	{
 		/**
 		 * @return The message names supported.
@@ -72,10 +77,10 @@ public class CustomHandlerAnnotationTest extends MessageBusTest
             MessageHandler handler = context.getHandler();
 			NamedMessageHandler namedMessageHandler = handler.getAnnotation(NamedMessageHandler.class);
 			if ( namedMessageHandler != null ) {
-				return Arrays.asList( namedMessageHandler.value() ).contains( message.getName() );
+				return Arrays.asList(namedMessageHandler.value() ).contains(message.getName() );
 			}
 
-			EnvelopedNamedMessageHandler envelopedHandler = handler.getAnnotation(EnvelopedNamedMessageHandler.class);
+			SomeNamedMessageHandler envelopedHandler = handler.getAnnotation(SomeNamedMessageHandler.class);
 			return envelopedHandler != null && Arrays.asList( envelopedHandler.value() ).contains( message.getName() );
 
 		}
@@ -105,9 +110,9 @@ public class CustomHandlerAnnotationTest extends MessageBusTest
 			handledByOne.add( message );
 		}
 
-		@EnvelopedNamedMessageHandler({ "messageTwo", "messageThree" })
-		void handlerTwo( MessageEnvelope envelope ) {
-			handledByTwo.add( (NamedMessage) envelope.getMessage() );
+		@SomeNamedMessageHandler({ "messageTwo", "messageThree" })
+		void handlerTwo( NamedMessage message ) {
+			handledByTwo.add(message);
 		}
 
 		@MessageThree
@@ -134,10 +139,6 @@ public class CustomHandlerAnnotationTest extends MessageBusTest
         assertEquals(2, listener.handledByOne.size());
 		assertTrue( listener.handledByOne.contains( messageOne ) );
 		assertTrue(listener.handledByOne.contains(messageTwo));
-
-        assertEquals(2, listener.handledByTwo.size());
-		assertTrue( listener.handledByTwo.contains( messageTwo ) );
-		assertTrue( listener.handledByTwo.contains( messageThree ) );
 
         assertEquals(1, listener.handledByThree.size());
 		assertTrue( listener.handledByThree.contains( messageThree ) );

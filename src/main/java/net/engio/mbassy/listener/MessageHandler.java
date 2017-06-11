@@ -1,8 +1,9 @@
 package net.engio.mbassy.listener;
 
+import net.engio.mbassy.bus.error.MessageBusException;
 import net.engio.mbassy.common.ReflectionUtils;
 import net.engio.mbassy.dispatch.HandlerInvocation;
-import net.engio.mbassy.dispatch.el.ElFilter;
+import net.engio.mbassy.dispatch.groovy.GroovyFilter;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -25,7 +26,6 @@ public class MessageHandler {
         public static final String InvocationMode = "invocationMode";
         public static final String Filter = "filter";
         public static final String Condition = "condition";
-        public static final String Enveloped = "envelope";
         public static final String HandledMessages = "messages";
         public static final String IsSynchronized = "synchronized";
         public static final String Listener = "listener";
@@ -53,45 +53,31 @@ public class MessageHandler {
             if(filter == null){
                 filter = new IMessageFilter[]{};
             }
-            Enveloped enveloped = ReflectionUtils.getAnnotation( handler, Enveloped.class );
-            Class[] handledMessages = enveloped != null
-                    ? enveloped.messages()
-                    : handler.getParameterTypes();
+            Class[] handledMessages = handler.getParameterTypes();
             handler.setAccessible(true);
             Map<String, Object> properties = new HashMap<String, Object>();
             properties.put(HandlerMethod, handler);
-            // add EL filter if a condition is present
-            if(handlerConfig.condition().length() > 0){
-                if (!ElFilter.isELAvailable()) {
-                    throw new IllegalStateException("A handler uses an EL filter but no EL implementation is available.");
+            // add Groovy filter if a condition is present
+            if(! handlerConfig.condition().isEmpty()){
+                if (! GroovyFilter.isGroovyAvailable()) {
+                    throw new IllegalStateException("A handler uses an groovy filter but no groovy implementation is available.");
                 }
 
                 IMessageFilter[] expandedFilter = new IMessageFilter[filter.length + 1];
-                for(int i = 0; i < filter.length ; i++){
-                   expandedFilter[i] = filter[i];
-                }
-                expandedFilter[filter.length] = new ElFilter();
+                System.arraycopy(filter, 0, expandedFilter, 0, filter.length);
+                expandedFilter[filter.length] = GroovyFilter.create(handlerConfig.condition(), handler.getParameterTypes()[0]);
                 filter = expandedFilter;
             }
             properties.put(Filter, filter);
-            properties.put(Condition, cleanEL(handlerConfig.condition()));
+            properties.put(Condition, handlerConfig.condition());
             properties.put(Priority, handlerConfig.priority());
             properties.put(Invocation, handlerConfig.invocation());
             properties.put(InvocationMode, handlerConfig.delivery());
-            properties.put(Enveloped, enveloped != null);
             properties.put(AcceptSubtypes, !handlerConfig.rejectSubtypes());
             properties.put(Listener, listenerConfig);
             properties.put(IsSynchronized, ReflectionUtils.getAnnotation( handler, Synchronized.class) != null);
             properties.put(HandledMessages, handledMessages);
             return properties;
-        }
-
-        private static String cleanEL(String expression) {
-
-            if (!expression.trim().startsWith("${") && !expression.trim().startsWith("#{")) {
-                expression = "${"+expression+"}";
-            }
-            return expression;
         }
     }
 
@@ -101,14 +87,12 @@ public class MessageHandler {
     private final IMessageFilter[] filter;
 
 	private final String condition;
-    
+
     private final int priority;
 
     private final Class<? extends HandlerInvocation> invocation;
 
     private final Invoke invocationMode;
-
-    private final boolean isEnvelope;
 
     private final Class[] handledMessages;
 
@@ -128,7 +112,6 @@ public class MessageHandler {
         this.priority = (Integer)properties.get(Properties.Priority);
         this.invocation = (Class<? extends HandlerInvocation>)properties.get(Properties.Invocation);
         this.invocationMode = (Invoke)properties.get(Properties.InvocationMode);
-        this.isEnvelope = (Boolean)properties.get(Properties.Enveloped);
         this.acceptsSubtypes = (Boolean)properties.get(Properties.AcceptSubtypes);
         this.listenerConfig = (MessageListener)properties.get(Properties.Listener);
         this.isSynchronized = (Boolean)properties.get(Properties.IsSynchronized);
@@ -143,7 +126,6 @@ public class MessageHandler {
                 new Object[]{Properties.Invocation, Class.class },
                 new Object[]{Properties.Filter, IMessageFilter[].class },
                 new Object[]{Properties.Condition, String.class },
-                new Object[]{Properties.Enveloped, Boolean.class },
                 new Object[]{Properties.HandledMessages, Class[].class },
                 new Object[]{Properties.IsSynchronized, Boolean.class },
                 new Object[]{Properties.Listener, MessageListener.class },
@@ -192,17 +174,13 @@ public class MessageHandler {
     public IMessageFilter[] getFilter() {
         return filter;
     }
-    
+
     public String getCondition() {
     	return this.condition;
     }
 
     public Class[] getHandledMessages() {
         return handledMessages;
-    }
-
-    public boolean isEnveloped() {
-        return isEnvelope;
     }
 
     public Class<? extends HandlerInvocation> getHandlerInvocation(){

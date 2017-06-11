@@ -41,12 +41,6 @@ class SimpleFileListener{
     public void expensiveOperation(File file){
       // do something with the file
     }
-    
-    @Handler(condition = "msg.size >= 10000")
-    @Enveloped(messages = {HashMap.class, LinkedList.class})
-    public void handleLarge(MessageEnvelope envelope) {
-       // handle objects without common super type
-    }
 
 }
 
@@ -68,7 +62,6 @@ bus.post(new File("/tmp/bigfile.csv")).asynchronously();
 |:-----|:-----|
 |`@Handler`|Mark a method as message handler|
 |`@Listener`|Can be used to customize listener wide configuration like the used reference type|
-|`@Enveloped`|A message envelope can be used to pass messages of different types into a single handler|
 |`@Filter`|Add filtering to prevent certain messages from being published|
 
 > Delivers everything, respects type hierarchy
@@ -90,11 +83,7 @@ Instead of using weak references, a listener can be configured to be referenced 
 
 > Message filtering
 
-MBassador offers static message filtering. Filters are configured using annotations and multiple filters can be attached to a single message handler. Since version 1.2.0 Java EL expressions in `@Handler` are another way to define conditional message dispatch. Messages that have matching handlers but do not pass the configured filters result in the publication of a FilteredMessage object which wraps the original message. FilteredMessage events can be handled by registering listeners that handle FilteredMessage.
-
-> Enveloped messages
-
-Message handlers can declare to receive an enveloped message using `Enveloped`. The envelope can wrap different types of messages to allow a single handler to handle multiple, unrelated message types.
+MBassador offers static message filtering. Filters are configured using annotations and multiple filters can be attached to a single message handler. Since version 2.0 Groovy expressions in `@Handler` are another way to define conditional message dispatch. Messages that have matching handlers but do not pass the configured filters result in the publication of a FilteredMessage object which wraps the original message. FilteredMessage events can be handled by registering listeners that handle FilteredMessage.
 
 > Handler priorities
 
@@ -150,7 +139,7 @@ Thanks to all [contributors](https://github.com/bennidi/mbassador/pulls?q=is%3Ap
 Many thanks also to ej-technologies for providing an open source license of 
 [![JProfiler](http://www.ej-technologies.com/images/banners/jprofiler_small.png)](http://www.ej-technologies.com/products/jprofiler/overview.html) and Jetbrains for a license of [IntelliJ IDEA](http://www.jetbrains.com/idea/)
 
-OSS used by MBassador: [jUnit](http://www.junit.org) | [maven](http://www.maven.org) | [mockito](http://www.mockito.org) | [slf4j](http://www.slf4j.org) | [Odysseus JUEL](http://juel.sourceforge.net/guide/start.html)
+OSS used by MBassador: [jUnit](http://www.junit.org) | [maven](http://www.maven.org) | [mockito](http://www.mockito.org) | [slf4j](http://www.slf4j.org)
 
 
 ##Contribute

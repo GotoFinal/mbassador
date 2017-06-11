@@ -2,16 +2,12 @@ package net.engio.mbassy;
 
 import net.engio.mbassy.common.AssertSupport;
 import net.engio.mbassy.listener.MessageListener;
-import net.engio.mbassy.listeners.SimpleHandler;
 import org.junit.Test;
-import net.engio.mbassy.listener.Enveloped;
 import net.engio.mbassy.listener.Handler;
 import net.engio.mbassy.listener.MetadataReader;
-import net.engio.mbassy.subscription.MessageEnvelope;
 
 import java.io.BufferedReader;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import static net.engio.mbassy.listener.MessageListener.ForMessage;
@@ -64,49 +60,6 @@ public class MetadataReaderTest extends AssertSupport {
                 .expectHandlers(0, BufferedReader.class);
         validator.check(listener);
     }
-
-    @Test
-    public void testEnveloped() {
-        MessageListener<EnvelopedListener> listener = reader.getMessageListener(EnvelopedListener.class);
-        ListenerValidator validator = new ListenerValidator()
-                .expectHandlers(1, String.class)
-                .expectHandlers(2, Integer.class)
-                .expectHandlers(2, Long.class)
-                .expectHandlers(1, Double.class)
-                .expectHandlers(1, Number.class)
-                .expectHandlers(0, List.class);
-        validator.check(listener);
-    }
-
-    @Test
-    public void testEnvelopedSubclass() {
-        MessageListener<EnvelopedListenerSubclass> listener = reader.getMessageListener(EnvelopedListenerSubclass.class);
-        ListenerValidator validator = new ListenerValidator()
-                .expectHandlers(1, String.class)
-                .expectHandlers(2, Integer.class)
-                .expectHandlers(1, Long.class)
-                .expectHandlers(0, Double.class)
-                .expectHandlers(0, Number.class);
-        validator.check(listener);
-    }
-
-    @Test
-    public void testAnonymousListener() {
-       SimpleHandler anonymousSimpleHandler = new SimpleHandler() {
-           @Override
-           @Handler
-           public void onMessage(Object msg) {
-               // nop
-           }
-       };
-        MessageListener<EnvelopedListenerSubclass> listener = reader.getMessageListener(anonymousSimpleHandler.getClass());
-        ListenerValidator validator = new ListenerValidator()
-                .expectHandlers(1, Object.class);
-        validator.check(listener);
-
-
-    }
-
 
     // Define and assert expectations on handlers in a listener
     private class ListenerValidator {
@@ -178,48 +131,4 @@ public class MetadataReaderTest extends AssertSupport {
         }
 
     }
-
-    public class EnvelopedListener{
-
-
-        @Handler(rejectSubtypes = true)
-        @Enveloped(messages = {String.class, Integer.class, Long.class})
-        public void handleEnveloped(MessageEnvelope o) {
-
-        }
-
-        @Handler
-        @Enveloped(messages = Number.class)
-        public void handleEnveloped2(MessageEnvelope o) {
-
-        }
-
-    }
-
-    public class EnvelopedListenerSubclass extends EnvelopedListener{
-
-        // narrow to integer
-        @Handler
-        @Enveloped(messages = Integer.class)
-        public void handleEnveloped2(MessageEnvelope o) {
-
-        }
-
-    }
-
-    public static interface ListenerInterface{
-
-        @Handler
-        @Enveloped(messages = Object.class)
-        void handle(MessageEnvelope envelope);
-    }
-
-    public class InterfacedListener implements  ListenerInterface{
-
-        @Override
-        public void handle(MessageEnvelope envelope) {
-            //
-        }
-    }
-
 }

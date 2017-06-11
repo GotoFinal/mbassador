@@ -2,7 +2,6 @@ package net.engio.mbassy.listener;
 
 import net.engio.mbassy.common.IPredicate;
 import net.engio.mbassy.common.ReflectionUtils;
-import net.engio.mbassy.subscription.MessageEnvelope;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -98,15 +97,6 @@ public class MetadataReader {
             // a messageHandler only defines one parameter (the message)
             System.out.println("Found no or more than one parameter in messageHandler [" + handler.getName()
                     + "]. A messageHandler must define exactly one parameter");
-            return false;
-        }
-        Enveloped envelope = ReflectionUtils.getAnnotation( handler, Enveloped.class);
-        if (envelope != null && !MessageEnvelope.class.isAssignableFrom(handler.getParameterTypes()[0])) {
-            System.out.println("Message envelope configured but no subclass of MessageEnvelope found as parameter");
-            return false;
-        }
-        if (envelope != null && envelope.messages().length == 0) {
-            System.out.println("Message envelope configured but message types defined for handler");
             return false;
         }
         return true;

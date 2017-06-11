@@ -1,3 +1,8 @@
+### 2.0
+ + Removed Envelope feature.
+ + Changed EL to Groovy
+
+-------------- gotofinal fork
 ### 1.3.1
 
 + TODO
