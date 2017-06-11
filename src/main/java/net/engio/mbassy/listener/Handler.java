@@ -60,6 +60,12 @@ public @interface Handler {
      */
     boolean enabled() default true;
 
+    /**
+     * Enable or disable default filter for cancelled events, uses {@link Cancellable} interfce, and only events implementing this interface will be affected
+     * by this settings.
+     */
+    boolean ignoreCancelled() default false;
+
 
     /**
      * Each handler call is implemented as an invocation object that implements the invocation mechanism.

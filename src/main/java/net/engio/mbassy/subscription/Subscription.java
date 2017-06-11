@@ -1,10 +1,8 @@
 package net.engio.mbassy.subscription;
 
-import net.engio.mbassy.bus.IMessagePublication;
 import net.engio.mbassy.bus.MessagePublication;
 import net.engio.mbassy.dispatch.IMessageDispatcher;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.UUID;
@@ -62,8 +60,8 @@ public class Subscription {
         return context.getHandler().handlesMessage(messageType);
     }
 
-    public Class[] getHandledMessageTypes(){
-        return context.getHandler().getHandledMessages();
+    public Class<?> getHandledMessageType(){
+        return context.getHandler().getHandledMessage();
     }
 
 

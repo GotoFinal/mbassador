@@ -140,19 +140,14 @@ public class SubscriptionManager {
             Subscription[] subscriptionsByListener = getSubscriptionsByListener(listener);
 
             if (subscriptionsByListener == null) {
-                for (int i=0, n=subscriptions.length; i<n; i++) {
+                for (int i = 0, n = subscriptions.length; i < n; i++) {
                     Subscription subscription = subscriptions[i];
                     subscription.subscribe(listener);
 
-                    for (Class<?> messageType : subscription.getHandledMessageTypes()) {
-                        // associate a subscription with a message type
-                        ArrayList<Subscription> subscriptions2 = subscriptionsPerMessage.get(messageType);
-                        if (subscriptions2 == null) {
-                            subscriptions2 = new ArrayList<Subscription>(8);
-                            subscriptionsPerMessage.put(messageType, subscriptions2);
-                        }
-                        subscriptions2.add(subscription);
-                    }
+                    Class<?> messageType = subscription.getHandledMessageType();
+                    // associate a subscription with a message type
+                    ArrayList<Subscription> subscriptions2 = subscriptionsPerMessage.computeIfAbsent(messageType, k -> new ArrayList<>(8));
+                    subscriptions2.add(subscription);
                 }
 
                 subscriptionsPerListener.put(listener.getClass(), subscriptions);

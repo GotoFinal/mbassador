@@ -23,16 +23,17 @@ public class MessageHandler {
 
     public static final class Properties{
 
-        public static final String MethodHandle = "handle";
+        public static final String MethodHandle = "methodHandle";
         public static final String HandlerMethod = "handler";
         public static final String InvocationMode = "invocationMode";
         public static final String Filter = "filter";
         public static final String Condition = "condition";
-        public static final String HandledMessages = "messages";
+        public static final String HandledMessage = "message";
         public static final String IsSynchronized = "synchronized";
         public static final String Listener = "listener";
         public static final String AcceptSubtypes = "subtypes";
         public static final String Priority = "priority";
+        public static final String IgnoreCancelled = "ignoreCancelled";
         public static final String Invocation = "invocation";
 
         /**
@@ -52,11 +53,14 @@ public class MessageHandler {
             if(handler == null){
                 throw new IllegalArgumentException("The message handler configuration may not be null");
             }
+            if(handler.getParameterCount() != 1) {
+                throw new IllegalArgumentException("The message handler must have only singe parameter");
+            }
             if(filter == null){
                 filter = new IMessageFilter[]{};
             }
             Map<String, Object> properties = new HashMap<String, Object>();
-            Class[] handledMessages = handler.getParameterTypes();
+            Class<?> handledMessage = handler.getParameterTypes()[0];
             handler.setAccessible(true);
             try {
                 MethodHandle methodHandle = MethodHandles.lookup().unreflect(handler);
@@ -65,6 +69,13 @@ public class MessageHandler {
                 throw new IllegalStateException(e);
             }
             properties.put(HandlerMethod, handler);
+            if (handlerConfig.ignoreCancelled() && Cancellable.class.isAssignableFrom(handledMessage)) {
+
+                IMessageFilter[] expandedFilter = new IMessageFilter[filter.length + 1];
+                System.arraycopy(filter, 0, expandedFilter, 0, filter.length);
+                expandedFilter[filter.length] = (IMessageFilter<Cancellable>) (msg, c) -> ! msg.isCancelled();
+                filter = expandedFilter;
+            }
             // add Groovy filter if a condition is present
             if(! handlerConfig.condition().isEmpty()){
                 if (! GroovyFilter.isGroovyAvailable()) {
@@ -79,12 +90,13 @@ public class MessageHandler {
             properties.put(Filter, filter);
             properties.put(Condition, handlerConfig.condition());
             properties.put(Priority, handlerConfig.priority());
+            properties.put(IgnoreCancelled, handlerConfig.ignoreCancelled());
             properties.put(Invocation, handlerConfig.invocation());
             properties.put(InvocationMode, handlerConfig.delivery());
             properties.put(AcceptSubtypes, !handlerConfig.rejectSubtypes());
             properties.put(Listener, listenerConfig);
             properties.put(IsSynchronized, ReflectionUtils.getAnnotation( handler, Synchronized.class) != null);
-            properties.put(HandledMessages, handledMessages);
+            properties.put(HandledMessage, handledMessage);
             return properties;
         }
     }
@@ -99,11 +111,13 @@ public class MessageHandler {
 
     private final int priority;
 
+    private final boolean ignoreCancelled;
+
     private final Class<? extends HandlerInvocation> invocation;
 
     private final Invoke invocationMode;
 
-    private final Class[] handledMessages;
+    private final Class<?> handledMessage;
 
     private final boolean acceptsSubtypes;
 
@@ -120,23 +134,26 @@ public class MessageHandler {
         this.filter = (IMessageFilter[])properties.get(Properties.Filter);
         this.condition = (String)properties.get(Properties.Condition);
         this.priority = (Integer)properties.get(Properties.Priority);
+        this.ignoreCancelled = (Boolean) properties.get(Properties.IgnoreCancelled);
         this.invocation = (Class<? extends HandlerInvocation>)properties.get(Properties.Invocation);
         this.invocationMode = (Invoke)properties.get(Properties.InvocationMode);
         this.acceptsSubtypes = (Boolean)properties.get(Properties.AcceptSubtypes);
         this.listenerConfig = (MessageListener)properties.get(Properties.Listener);
         this.isSynchronized = (Boolean)properties.get(Properties.IsSynchronized);
-        this.handledMessages = (Class[])properties.get(Properties.HandledMessages);
+        this.handledMessage = (Class<?>)properties.get(Properties.HandledMessage);
     }
 
     private void validate(Map<String, Object> properties){
         // define expected types of known properties
         Object[][] expectedProperties = new Object[][]{
+                new Object[]{Properties.MethodHandle, MethodHandle.class },
                 new Object[]{Properties.HandlerMethod, Method.class },
                 new Object[]{Properties.Priority, Integer.class },
+                new Object[]{Properties.IgnoreCancelled, Boolean.class },
                 new Object[]{Properties.Invocation, Class.class },
                 new Object[]{Properties.Filter, IMessageFilter[].class },
                 new Object[]{Properties.Condition, String.class },
-                new Object[]{Properties.HandledMessages, Class[].class },
+                new Object[]{Properties.HandledMessage, Class.class },
                 new Object[]{Properties.IsSynchronized, Boolean.class },
                 new Object[]{Properties.Listener, MessageListener.class },
                 new Object[]{Properties.AcceptSubtypes, Boolean.class }
@@ -173,6 +190,10 @@ public class MessageHandler {
         return filter.length > 0 || (condition != null && condition.trim().length() > 0);
     }
 
+    public boolean isIgnoreCancelled() {
+        return ignoreCancelled;
+    }
+
     public int getPriority() {
         return priority;
     }
@@ -193,8 +214,8 @@ public class MessageHandler {
     	return this.condition;
     }
 
-    public Class[] getHandledMessages() {
-        return handledMessages;
+    public Class<?> getHandledMessage() {
+        return handledMessage;
     }
 
     public Class<? extends HandlerInvocation> getHandlerInvocation(){
@@ -202,15 +223,7 @@ public class MessageHandler {
     }
 
     public boolean handlesMessage(Class<?> messageType) {
-        for (Class<?> handledMessage : handledMessages) {
-            if (handledMessage.equals(messageType)) {
-                return true;
-            }
-            if (handledMessage.isAssignableFrom(messageType) && acceptsSubtypes()) {
-                return true;
-            }
-        }
-        return false;
+        return handledMessage.equals(messageType) || (acceptsSubtypes() && handledMessage.isAssignableFrom(messageType));
     }
 
     public boolean acceptsSubtypes() {

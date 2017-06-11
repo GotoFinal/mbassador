@@ -25,12 +25,7 @@ public class Filters {
         @Override
         public boolean accepts(final Object event, final SubscriptionContext context) {
             final MessageHandler metadata = context.getHandler();
-            for (Class handledMessage : metadata.getHandledMessages()) {
-                if (handledMessage.equals(event.getClass())) {
-                    return true;
-                }
-            }
-            return false;
+            return metadata.getHandledMessage().equals(event.getClass());
         }
     }
 
@@ -45,12 +40,8 @@ public class Filters {
         @Override
         public boolean accepts(final Object message, final SubscriptionContext context) {
             final MessageHandler metadata = context.getHandler();
-            for(Class acceptedClasses : metadata.getHandledMessages()){
-                if(acceptedClasses.isAssignableFrom(message.getClass())
-                        && ! acceptedClasses.equals(message.getClass()))
-                    return true;
-            }
-            return false;
+            Class<?> handledMessages = metadata.getHandledMessage();
+            return handledMessages.isAssignableFrom(message.getClass()) && ! handledMessages.equals(message.getClass());
         }
     }
 
