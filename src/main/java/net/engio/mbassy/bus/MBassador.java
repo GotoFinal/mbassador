@@ -62,6 +62,9 @@ public class MBassador<T> extends AbstractSyncAsyncMessageBus<T, SyncAsyncPostCo
      */
     public IMessagePublication publish(T message) {
         IMessagePublication publication = createMessagePublication(message);
+        if (publication == null) {
+            return null;
+        }
         try {
             publication.execute();
         } catch (Throwable e) {

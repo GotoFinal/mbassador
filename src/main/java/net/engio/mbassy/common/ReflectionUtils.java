@@ -6,7 +6,9 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @author bennidi
@@ -62,6 +64,8 @@ public class ReflectionUtils
         return null;
     }
 
+    private static Map<Class, Class[]> superTypeCache = new ConcurrentHashMap<>(200);
+
     /**
      * Collect all directly and indirectly related super types (classes and interfaces) of
      * a given class.
@@ -70,18 +74,20 @@ public class ReflectionUtils
      * @return A set of classes, each representing a super type of the root class
      */
     public static Class[] getSuperTypes(Class from) {
-        ArrayList<Class> superclasses = new ArrayList<Class>();
+        return superTypeCache.computeIfAbsent(from, clazz -> {
+            ArrayList<Class> superclasses = new ArrayList<Class>();
 
-        collectInterfaces( from, superclasses );
-        while ( !from.equals( Object.class ) && !from.isInterface() ) {
-            superclasses.add( from.getSuperclass() );
-            from = from.getSuperclass();
-            collectInterfaces( from, superclasses );
-        }
+            collectInterfaces(clazz, superclasses);
+            while (! clazz.equals(Object.class) && ! clazz.isInterface()) {
+                superclasses.add(clazz.getSuperclass());
+                clazz = clazz.getSuperclass();
+                collectInterfaces(clazz, superclasses);
+            }
 
-        final Class[] classes = new Class[superclasses.size()];
-        superclasses.toArray(classes);
-        return classes;
+            final Class[] classes = new Class[superclasses.size()];
+            superclasses.toArray(classes);
+            return classes;
+        });
     }
 
     public static void collectInterfaces( Class from, Collection<Class> accumulator ) {

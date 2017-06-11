@@ -83,6 +83,9 @@ public abstract class AbstractSyncAsyncMessageBus<T, P extends ISyncAsyncPublica
 
     // this method queues a message delivery request
     protected IMessagePublication addAsynchronousPublication(MessagePublication publication) {
+        if (publication == null) {
+            return null;
+        }
         try {
             pendingMessages.put(publication);
             return publication.markScheduled();

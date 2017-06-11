@@ -7,6 +7,7 @@ import net.engio.mbassy.listener.MessageHandler;
 import net.engio.mbassy.listener.MetadataReader;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
@@ -48,6 +49,9 @@ public class SubscriptionManager {
 
     private final BusRuntime runtime;
 
+    // cached TreeSet, cleared on each register
+    private final Map<Class<?>, Collection<Subscription>> subscriptionByMessageTypeCache = new ConcurrentHashMap<>(200);
+
     public SubscriptionManager(MetadataReader metadataReader, SubscriptionFactory subscriptionFactory, BusRuntime runtime) {
         this.metadataReader = metadataReader;
         this.subscriptionFactory = subscriptionFactory;
@@ -70,7 +74,11 @@ public class SubscriptionManager {
         for (Subscription subscription : subscriptions) {
             isRemoved &= subscription.unsubscribe(listener);
         }
-        return isRemoved;
+        if (isRemoved) {
+            subscriptionByMessageTypeCache.clear();
+            return true;
+        }
+        return false;
     }
 
 
@@ -86,12 +94,12 @@ public class SubscriptionManager {
         return subscriptions;
     }
 
-    public void subscribe(Object listener) {
+    public boolean subscribe(Object listener) {
         try {
             Class<?> listenerClass = listener.getClass();
 
             if (nonListeners.contains(listenerClass)) {
-                return; // early reject of known classes that do not define message handlers
+                return false; // early reject of known classes that do not define message handlers
             }
             Subscription[] subscriptionsByListener = getSubscriptionsByListener(listener);
             // a listener is either subscribed for the first time
@@ -101,7 +109,7 @@ public class SubscriptionManager {
 
                 if (length == 0) {  // remember the class as non listening class if no handlers are found
                     nonListeners.add(listenerClass);
-                    return;
+                    return false;
                 }
                 subscriptionsByListener = new Subscription[length]; // it's safe to use non-concurrent collection here (read only)
 
@@ -121,7 +129,8 @@ public class SubscriptionManager {
                     sub.subscribe(listener);
                 }
             }
-
+            subscriptionByMessageTypeCache.clear();
+            return true;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -168,36 +177,38 @@ public class SubscriptionManager {
     // obtain the set of subscriptions for the given message type
     // Note: never returns null!
     public Collection<Subscription> getSubscriptionsByMessageType(Class messageType) {
-        Set<Subscription> subscriptions = new TreeSet<Subscription>(Subscription.SubscriptionByPriorityDesc);
-        ReadLock readLock = readWriteLock.readLock();
-        try {
-            readLock.lock();
+        return subscriptionByMessageTypeCache.computeIfAbsent(messageType, msgType -> {
+            SortedSet<Subscription> subscriptions = new TreeSet<>(Subscription.SubscriptionByPriorityDesc);
+            ReadLock readLock = readWriteLock.readLock();
+            try {
+                readLock.lock();
 
-            Subscription subscription;
-            ArrayList<Subscription> subsPerMessage = subscriptionsPerMessage.get(messageType);
+                Subscription subscription;
+                ArrayList<Subscription> subsPerMessage = subscriptionsPerMessage.get(msgType);
 
-            if (subsPerMessage != null) {
-                subscriptions.addAll(subsPerMessage);
-            }
+                if (subsPerMessage != null) {
+                    subscriptions.addAll(subsPerMessage);
+                }
 
-            Class[] types = ReflectionUtils.getSuperTypes(messageType);
-            for (int i=0, n=types.length; i<n; i++) {
-                Class eventSuperType = types[i];
-                
-                ArrayList<Subscription> subs = subscriptionsPerMessage.get(eventSuperType);
-                if (subs != null) {
-                    for (int j = 0,m=subs.size(); j<m; j++) {
-                        subscription = subs.get(j);
+                Class<?>[] types = ReflectionUtils.getSuperTypes(msgType);
+                for (int i = 0, n = types.length; i < n; i++) {
+                    Class eventSuperType = types[i];
 
-                        if (subscription.handlesMessageType(messageType)) {
-                            subscriptions.add(subscription);
+                    ArrayList<Subscription> subs = subscriptionsPerMessage.get(eventSuperType);
+                    if (subs != null) {
+                        for (int j = 0, m = subs.size(); j < m; j++) {
+                            subscription = subs.get(j);
+
+                            if (subscription.handlesMessageType(msgType)) {
+                                subscriptions.add(subscription);
+                            }
                         }
                     }
                 }
+            } finally {
+                readLock.unlock();
             }
-        }finally{
-            readLock.unlock();
-        }
-        return subscriptions;
+            return new ArrayList<>(subscriptions);
+        });
     }
 }

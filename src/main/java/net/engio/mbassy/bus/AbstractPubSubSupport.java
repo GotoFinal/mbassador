@@ -10,7 +10,13 @@ import net.engio.mbassy.bus.error.PublicationError;
 import net.engio.mbassy.subscription.Subscription;
 import net.engio.mbassy.subscription.SubscriptionManager;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static net.engio.mbassy.bus.config.IBusConfiguration.Properties.BusId;
 import static net.engio.mbassy.bus.config.IBusConfiguration.Properties.PublicationErrorHandlers;
@@ -25,6 +31,19 @@ public abstract class AbstractPubSubSupport<T> implements PubSubSupport<T> {
 
     // this handler will receive all errors that occur during message dispatch or message handling
     private final List<IPublicationErrorHandler> errorHandlers = new ArrayList<IPublicationErrorHandler>();
+
+    // Cache already processed events that do not have any subscribers
+    private final Set<Class> unusedEvents = Collections.newSetFromMap(new ConcurrentHashMap<>(200));
+
+    public void clearUnusedEventsCache() {
+        unusedEvents.clear();
+    }
+
+    public boolean isUnusedEventType(Class<?> type) {
+        return unusedEvents.contains(type);
+    }
+
+    private final boolean useUnusedEvent;
 
     private final MessagePublication.Factory publicationFactory;
 
@@ -43,6 +62,7 @@ public abstract class AbstractPubSubSupport<T> implements PubSubSupport<T> {
             errorHandlers.add(new IPublicationErrorHandler.ConsoleLogger());
             System.out.println(ERROR_HANDLER_MSG);
         }
+        this.useUnusedEvent = configuration.getProperty("useUnusedEvent", true);
         this.runtime = new BusRuntime(this)
                 .add(PublicationErrorHandlers, configuration.getRegisteredPublicationErrorHandlers())
                 .add(BusId, configuration.getProperty(BusId, UUID.randomUUID().toString()));
@@ -66,14 +86,18 @@ public abstract class AbstractPubSubSupport<T> implements PubSubSupport<T> {
     }
 
     public boolean unsubscribe(Object listener) {
-        return subscriptionManager.unsubscribe(listener);
+        if (subscriptionManager.unsubscribe(listener)) {
+            clearUnusedEventsCache();
+            return true;
+        }
+        return false;
     }
-
 
     public void subscribe(Object listener) {
-        subscriptionManager.subscribe(listener);
+        if (subscriptionManager.subscribe(listener)) {
+            clearUnusedEventsCache();
+        }
     }
-
 
     @Override
     public BusRuntime getRuntime() {
@@ -81,14 +105,23 @@ public abstract class AbstractPubSubSupport<T> implements PubSubSupport<T> {
     }
 
     protected MessagePublication createMessagePublication(T message) {
-        Collection<Subscription> subscriptions = getSubscriptionsByMessageType(message.getClass());
-        if ((subscriptions == null || subscriptions.isEmpty()) && !message.getClass()
-                .equals(DeadMessage.class)) {
-            // DeadMessage Event
-            subscriptions = getSubscriptionsByMessageType(DeadMessage.class);
-            return getPublicationFactory().createPublication(runtime, subscriptions, new DeadMessage(message));
+        Class<?> messageClass = message.getClass();
+        if (isUnusedEventType(messageClass))
+            return null;
+        Collection<Subscription> subscriptions = this.getSubscriptionsByMessageType(messageClass);
+        if ((subscriptions == null) || subscriptions.isEmpty()) {
+            if (this.useUnusedEvent) {
+                if (message.getClass().equals(DeadMessage.class)) {
+                    return null;
+                }
+                subscriptions = getSubscriptionsByMessageType(DeadMessage.class);
+                return getPublicationFactory().createPublication(runtime, subscriptions, new DeadMessage(message));
+            }
+            // unused event
+            unusedEvents.add(messageClass);
+            return null;
         } else {
-            return getPublicationFactory().createPublication(runtime, subscriptions, message);
+            return this.getPublicationFactory().createPublication(this.getRuntime(), subscriptions, message);
         }
     }
 
