@@ -2,6 +2,7 @@ package net.engio.mbassy.listener;
 
 import net.engio.mbassy.dispatch.HandlerInvocation;
 import net.engio.mbassy.dispatch.ReflectiveHandlerInvocation;
+import org.intellij.lang.annotations.Language;
 
 import java.lang.annotation.*;
 
@@ -14,7 +15,7 @@ import java.lang.annotation.*;
  */
 @Retention(value = RetentionPolicy.RUNTIME)
 @Inherited
-@Target(value = {ElementType.METHOD,ElementType.ANNOTATION_TYPE})
+@Target(value = {ElementType.METHOD, ElementType.ANNOTATION_TYPE})
 public @interface Handler {
 
     /**
@@ -22,8 +23,7 @@ public @interface Handler {
      * is actually invoked, which is only if all the filters accept the message.
      */
     Filter[] filters() default {};
-    
-    
+
     /**
      * Defines a filter condition as Groovy. This can be used to filter the events based on
      * attributes of the event object. Note that the expression must resolve to either
@@ -31,6 +31,9 @@ public @interface Handler {
      * The message itself is available as "msg" variable. 
      * @return the condition in Groovy syntax.
      */
+    @Language(value = "groovy",
+              prefix = "boolean void test(def msg, net.engio.mbassy.subscription.SubscriptionContext context) { return ",
+              suffix = ";\n}")
     String condition() default "";
 
     /**
@@ -52,7 +55,6 @@ public @interface Handler {
      */
     boolean rejectSubtypes() default false;
 
-
     /**
      * Enable or disable the handler. Disabled handlers do not receive any messages.
      * This property is useful for quick changes in configuration and necessary to disable
@@ -66,7 +68,6 @@ public @interface Handler {
      */
     boolean ignoreCancelled() default false;
 
-
     /**
      * Each handler call is implemented as an invocation object that implements the invocation mechanism.
      * The basic implementation uses reflection and is the default. It is possible though to provide a custom
@@ -77,6 +78,4 @@ public @interface Handler {
      *
      */
     Class<? extends HandlerInvocation> invocation() default ReflectiveHandlerInvocation.class;
-
-
 }
