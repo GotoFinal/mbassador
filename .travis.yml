@@ -1,4 +1,4 @@
 jdk:
-  - openjdk6
+  - openjdk8
 script:
   mvn clean test
